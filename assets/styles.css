@@ -1,0 +1,128 @@
+* {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #02040a;
+  color: #f3f4f6;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+.font-orbitron {
+  font-family: 'Orbitron', sans-serif;
+}
+.font-syne {
+  font-family: 'Syne', sans-serif;
+}
+.font-mono {
+  font-family: 'Space Mono', monospace;
+}
+
+/* Custom Scrollbars in HUD Panels */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(2, 4, 10, 0.8);
+}
+::-webkit-scrollbar-thumb {
+  background: #06b6d4;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #38bdf8;
+}
+
+/* HUD Glassmorphism Styling */
+.hud-glass {
+  background: rgba(8, 13, 26, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  box-shadow:
+    0 8px 32px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 15px rgba(56, 189, 248, 0.05);
+}
+
+.hud-glass-amber {
+  background: rgba(24, 16, 8, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Hover Reticle HUD Target */
+#hud-reticle {
+  pointer-events: none;
+  position: fixed;
+  z-index: 40;
+  transform: translate(-50%, -50%);
+  transition:
+    width 0.2s ease,
+    height 0.2s ease,
+    opacity 0.2s ease;
+  will-change: transform, left, top;
+}
+
+/* Pulse Animations */
+@keyframes reticleSpin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+.animate-reticle-spin {
+  animation: reticleSpin 12s linear infinite;
+}
+
+/* Custom Space Cursor Dot */
+#space-cursor-dot {
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transform: translate(-50%, -50%);
+  will-change: transform;
+}
+
+/* Modal Blur Transition */
+.modal-overlay {
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+  transform: scale(0.95);
+}
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+/* Warp Speed Overlay Effect */
+#warp-overlay {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: radial-gradient(
+    circle,
+    transparent 20%,
+    rgba(6, 182, 212, 0.4) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+#warp-overlay.active {
+  opacity: 1;
+}

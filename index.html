@@ -1,11 +1,945 @@
 <!doctype html>
-<html lang="en">
+<html lang="id" class="dark scroll-smooth">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>Remote Device Management</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="./assets/tailwind.config.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- FontAwesome & Canvas Confetti -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <link rel="stylesheet" href="./assets/styles.css" />
   </head>
-  <body>
-    <h1>KEVIN KAMPRET</h1>
+  <body class="selection:bg-cyan-500 selection:text-black">
+    <!-- 3D FULLSCREEN SOLAR SYSTEM WEBGL CANVAS -->
+    <div
+      id="canvas-container"
+      class="w-full h-full absolute inset-0 z-0 cursor-grab active:cursor-grabbing"
+    ></div>
+
+    <!-- WARP SPEED VISUAL EFFECT OVERLAY -->
+    <div id="warp-overlay"></div>
+
+    <!-- SPACE CURSOR POINTER DOT -->
+    <div
+      id="space-cursor-dot"
+      class="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_12px_#38bdf8] hidden md:block"
+    ></div>
+
+    <!-- TARGET RETICLE HUD ON PLANET HOVER -->
+    <div
+      id="hud-reticle"
+      class="opacity-0 w-32 h-32 flex items-center justify-center"
+    >
+      <div
+        class="absolute inset-0 border border-dashed border-cyan-400/60 rounded-full animate-reticle-spin"
+      ></div>
+      <div
+        class="absolute w-full h-full border border-cyan-400/30 rounded-full scale-110"
+      ></div>
+      <div
+        class="absolute -top-6 text-[10px] font-mono tracking-widest text-cyan-300 font-bold bg-black/80 px-2 py-0.5 rounded border border-cyan-500/30 whitespace-nowrap"
+        id="reticle-label"
+      >
+        TARGET_ACQUIRED
+      </div>
+      <div
+        class="absolute -bottom-6 text-[9px] font-mono text-amber-400 bg-black/80 px-2 py-0.5 rounded border border-amber-500/30 whitespace-nowrap animate-pulse"
+      >
+        [ KLIK UNTUK MEMBUKA PLANET ]
+      </div>
+    </div>
+
+    <!-- TOP HUD TOOLBAR / NAVIGATION -->
+    <header
+      class="fixed top-4 left-1/2 -translate-x-1/2 w-[95%] max-w-7xl z-30 pointer-events-auto"
+    >
+      <div
+        class="hud-glass rounded-2xl px-4 py-3 flex items-center justify-between border border-cyan-500/30 shadow-2xl"
+      >
+        <!-- Logo Brand -->
+        <button
+          id="reset-cam-logo"
+          class="group flex items-center gap-3 text-left focus:outline-none"
+          title="Kembali ke Tampilan Utama Tata Surya"
+        >
+          <div
+            class="relative w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-red-500 flex items-center justify-center text-black font-black text-sm group-hover:scale-110 transition-transform shadow-[0_0_20px_rgba(245,158,11,0.8)]"
+          >
+            <span
+              class="animate-ping absolute inset-0 rounded-full bg-amber-400 opacity-40"
+            ></span>
+            <i class="fa-solid fa-sun text-base"></i>
+          </div>
+          <div>
+            <div
+              class="font-orbitron font-extrabold text-sm text-white tracking-wider group-hover:text-amber-400 transition-colors"
+            >
+              ORBIT<span class="text-cyan-400">.SYS</span>
+            </div>
+            <div
+              class="text-[9px] font-mono text-gray-400 -mt-0.5 tracking-tight"
+            >
+              LINTASAN ORBIT TATA SURYA
+            </div>
+          </div>
+        </button>
+
+        <!-- Planet Quick-Jump Selector Bar (Desktop) -->
+        <nav class="hidden xl:flex items-center gap-2 text-xs font-mono">
+          <button
+            data-planet="MATAHARI"
+            class="planet-nav-btn px-3 py-1.5 rounded-lg hover:bg-white/10 text-amber-400 flex items-center gap-1.5 transition-all"
+            title="Buka Sun Core"
+          >
+            <span
+              class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]"
+            ></span>
+            <span>MATAHARI</span>
+          </button>
+          <button
+            data-planet="MERKURIUS"
+            class="planet-nav-btn px-3 py-1.5 rounded-lg hover:bg-white/10 text-gray-300 flex items-center gap-1.5 transition-all"
+            title="Buka Merkurius"
+          >
+            <span class="w-2.5 h-2.5 rounded-full bg-gray-400"></span>
+            <span>MERKURIUS</span>
+          </button>
+          <button
+            data-planet="VENUS"
+            class="planet-nav-btn px-3 py-1.5 rounded-lg hover:bg-white/10 text-yellow-300 flex items-center gap-1.5 transition-all"
+            title="Buka Venus"
+          >
+            <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+            <span>VENUS</span>
+          </button>
+          <button
+            data-planet="BUMI"
+            class="planet-nav-btn px-3 py-1.5 rounded-lg hover:bg-white/10 text-blue-400 flex items-center gap-1.5 transition-all"
+            title="Buka Bumi"
+          >
+            <span
+              class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"
+            ></span>
+            <span>BUMI</span>
+          </button>
+          <button
+            data-planet="MARS"
+            class="planet-nav-btn px-3 py-1.5 rounded-lg hover:bg-white/10 text-red-400 flex items-center gap-1.5 transition-all"
+            title="Buka Mars"
+          >
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+            <span>MARS</span>
+          </button>
+          <button
+            data-planet="YUPITER"
+            class="planet-nav-btn px-3 py-1.5 rounded-lg hover:bg-white/10 text-orange-400 flex items-center gap-1.5 transition-all"
+            title="Buka Yupiter"
+          >
+            <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+            <span>YUPITER</span>
+          </button>
+          <button
+            data-planet="SATURNUS"
+            class="planet-nav-btn px-3 py-1.5 rounded-lg hover:bg-white/10 text-yellow-400 flex items-center gap-1.5 transition-all"
+            title="Buka Saturnus"
+          >
+            <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+            <span>SATURNUS</span>
+          </button>
+          <button
+            data-planet="NEPTUNUS"
+            class="planet-nav-btn px-3 py-1.5 rounded-lg hover:bg-white/10 text-cyan-400 flex items-center gap-1.5 transition-all"
+            title="Buka Neptunus"
+          >
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+            <span>NEPTUNUS</span>
+          </button>
+        </nav>
+
+        <!-- Controls & Audio Switch -->
+        <div class="flex items-center gap-2">
+          <!-- Camera View Perspective Dropdown -->
+          <button
+            id="view-angle-btn"
+            class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-xs font-mono flex items-center gap-2 transition-all"
+            title="Ubah Sudut Pandang Kamera"
+          >
+            <i class="fa-solid fa-camera-rotate text-cyan-400"></i>
+            <span id="view-mode-label" class="hidden sm:inline"
+              >PERSPEKTIF 3D</span
+            >
+          </button>
+
+          <!-- Speed Orbit Toggle Button -->
+          <button
+            id="speed-toggle-btn"
+            class="px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-mono flex items-center gap-2 transition-all"
+            title="Kecepatan Orbit"
+          >
+            <i class="fa-solid fa-gauge-high"></i>
+            <span id="speed-label" class="hidden sm:inline">ORBIT 1X</span>
+          </button>
+
+          <!-- Audio FX Synthesizer Toggle -->
+          <button
+            id="sound-toggle-btn"
+            class="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-amber-400 transition-all"
+            title="Suara Scanner Kosmik"
+          >
+            <i id="sound-icon" class="fa-solid fa-volume-xmark text-xs"></i>
+          </button>
+
+          <!-- Mobile Menu Selector Toggle -->
+          <button
+            id="mobile-planet-trigger"
+            class="xl:hidden p-2.5 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-xs font-mono"
+          >
+            <i class="fa-solid fa-globe"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile Planet Dropdown List -->
+      <div
+        id="mobile-planet-menu"
+        class="hidden xl:hidden hud-glass mt-2 rounded-2xl p-4 flex-col gap-2 font-mono text-xs border border-cyan-500/30 shadow-2xl"
+      >
+        <div
+          class="text-[10px] text-gray-400 uppercase tracking-widest pb-1 border-b border-white/10"
+        >
+          PILIH PLANET MENU:
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            data-planet="MATAHARI"
+            class="planet-nav-btn text-amber-400 p-2 rounded bg-white/5 text-left flex items-center gap-2"
+          >
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span> MATAHARI
+          </button>
+          <button
+            data-planet="MERKURIUS"
+            class="planet-nav-btn text-gray-300 p-2 rounded bg-white/5 text-left flex items-center gap-2"
+          >
+            <span class="w-2 h-2 rounded-full bg-gray-400"></span> MERKURIUS
+          </button>
+          <button
+            data-planet="VENUS"
+            class="planet-nav-btn text-yellow-300 p-2 rounded bg-white/5 text-left flex items-center gap-2"
+          >
+            <span class="w-2 h-2 rounded-full bg-yellow-500"></span> VENUS
+          </button>
+          <button
+            data-planet="BUMI"
+            class="planet-nav-btn text-blue-400 p-2 rounded bg-white/5 text-left flex items-center gap-2"
+          >
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span> BUMI
+          </button>
+          <button
+            data-planet="MARS"
+            class="planet-nav-btn text-red-400 p-2 rounded bg-white/5 text-left flex items-center gap-2"
+          >
+            <span class="w-2 h-2 rounded-full bg-red-500"></span> MARS
+          </button>
+          <button
+            data-planet="YUPITER"
+            class="planet-nav-btn text-orange-400 p-2 rounded bg-white/5 text-left flex items-center gap-2"
+          >
+            <span class="w-2 h-2 rounded-full bg-orange-500"></span> YUPITER
+          </button>
+          <button
+            data-planet="SATURNUS"
+            class="planet-nav-btn text-yellow-400 p-2 rounded bg-white/5 text-left flex items-center gap-2"
+          >
+            <span class="w-2 h-2 rounded-full bg-yellow-400"></span> SATURNUS
+          </button>
+          <button
+            data-planet="NEPTUNUS"
+            class="planet-nav-btn text-cyan-400 p-2 rounded bg-white/5 text-left flex items-center gap-2"
+          >
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span> NEPTUNUS
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- BOTTOM HUD INFORMATION & CAMERA RESET TOOLBAR -->
+    <div
+      class="fixed bottom-6 left-6 right-6 z-20 pointer-events-none flex flex-col sm:flex-row items-end sm:items-center justify-between gap-4"
+    >
+      <!-- Live Orbital Telemetry Status -->
+      <div
+        class="hud-glass rounded-2xl px-4 py-3 font-mono text-[11px] text-gray-300 border border-cyan-500/30 flex items-center gap-4 pointer-events-auto shadow-lg"
+      >
+        <div class="flex items-center gap-2">
+          <span
+            class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"
+          ></span>
+          <span class="text-emerald-400 font-bold"
+            >STATUS TATA SURYA: ACTIVE</span
+          >
+        </div>
+        <div class="hidden md:block text-gray-500">|</div>
+        <div class="hidden md:block text-gray-400">
+          LINTASAN ORBIT:
+          <span class="text-cyan-300 font-bold">8 LINTASAN AKTIF</span>
+        </div>
+        <div class="hidden md:block text-gray-500">|</div>
+        <div id="active-hover-info" class="text-amber-400 font-bold">
+          MENGORBIT REVOLUSI REAL-TIME
+        </div>
+      </div>
+
+      <!-- Camera Orbit Reset Button -->
+      <button
+        id="reset-camera-btn"
+        class="hud-glass pointer-events-auto px-5 py-3 rounded-2xl border border-cyan-400/40 text-cyan-300 hover:text-white font-mono text-xs flex items-center gap-2.5 hover:bg-cyan-500/20 hover:scale-105 transition-all shadow-xl"
+        title="Reset Tampilan Kamera Solar"
+      >
+        <i class="fa-solid fa-expand text-sm text-cyan-400"></i>
+        <span>RESET KAMERA ORBIT</span>
+      </button>
+    </div>
+
+    <!-- INSTRUCTIONS HINT OVERLAY -->
+    <div
+      class="fixed top-24 left-1/2 -translate-x-1/2 z-10 pointer-events-none text-center"
+    >
+      <div
+        class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 backdrop-blur-md text-xs font-mono text-gray-300 shadow-xl animate-bounce"
+      >
+        <i class="fa-solid fa-hand-pointer text-cyan-400"></i>
+        <span
+          >Geser Mouse Untuk Rotasi Kamera • Scroll Zoom In/Out • Klik Planet
+          Untuk Membuka Menu</span
+        >
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- INTERACTIVE PLANET FEATURE PAGES / MODALS OVERLAY                   -->
+    <!-- =================================================================== -->
+
+    <!-- MODAL 1: MATAHARI (SUN CORE / ABOUT ME) -->
+    <div
+      id="modal-MATAHARI"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md"
+    >
+      <div
+        class="hud-glass-amber rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-10 border border-amber-500/50 shadow-2xl relative"
+      >
+        <div
+          class="flex items-center justify-between border-b border-amber-500/30 pb-4 mb-6"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-black font-black text-lg"
+            >
+              <i class="fa-solid fa-sun"></i>
+            </div>
+            <div>
+              <div class="font-orbitron font-extrabold text-2xl text-amber-400">
+                MATAHARI // CORE PROFILE
+              </div>
+              <div class="font-mono text-xs text-amber-200/80">
+                PUSAT ENERGI DESAIN & VISI UTAMA
+              </div>
+            </div>
+          </div>
+          <button
+            class="close-modal-btn p-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 font-mono text-xs flex items-center gap-2 transition-all"
+          >
+            <span>Kembali ke Tata Surya</span>
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+          <div class="md:col-span-5 flex flex-col items-center text-center">
+            <div
+              class="w-48 h-48 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-red-600 flex items-center justify-center shadow-[0_0_60px_rgba(245,158,11,0.6)] border-4 border-amber-300 mb-4 animate-pulse"
+            >
+              <i class="fa-solid fa-user-astronaut text-6xl text-black/80"></i>
+            </div>
+            <div class="font-syne font-bold text-xl text-white">
+              ORBITAL CREATIVE DIRECTOR
+            </div>
+            <div class="font-mono text-xs text-amber-400 mt-1">
+              SISTEM DESAIN & MOTION SPASIAL
+            </div>
+          </div>
+
+          <div class="md:col-span-7 space-y-4">
+            <h3 class="font-syne font-extrabold text-2xl text-white">
+              MENJELAJAHI BATTEN ESTETIKA VISUAL KHUSUS DENGAN PRESISI ORBIT
+            </h3>
+            <p class="text-gray-300 text-sm leading-relaxed font-light">
+              Selamat datang di pusat gravitasional tata surya portofolio saya.
+              Saya seorang Digital Product Designer & Spatial Motion Specialist
+              yang fokus membangun antarmuka web 3D interaktif, ekosistem UI/UX
+              kompleks, serta pengalaman digital yang responsif dan imersif.
+            </p>
+            <div class="grid grid-cols-2 gap-3 pt-2 font-mono text-xs">
+              <div
+                class="p-3 rounded-xl bg-black/40 border border-amber-500/20"
+              >
+                <span class="text-gray-400 block">Eksplorasi System:</span>
+                <span class="text-amber-400 font-bold text-sm">9+ Tahun</span>
+              </div>
+              <div
+                class="p-3 rounded-xl bg-black/40 border border-amber-500/20"
+              >
+                <span class="text-gray-400 block">Proyek Orbit:</span>
+                <span class="text-amber-400 font-bold text-sm"
+                  >142 Selesai</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 2: MERKURIUS (MERCURY / TELEMETRY & SKILLS) -->
+    <div
+      id="modal-MERKURIUS"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md"
+    >
+      <div
+        class="hud-glass rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-10 border border-gray-400/40 shadow-2xl relative"
+      >
+        <div
+          class="flex items-center justify-between border-b border-gray-500/30 pb-4 mb-6"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-black font-black text-lg"
+            >
+              <i class="fa-solid fa-microchip"></i>
+            </div>
+            <div>
+              <div class="font-orbitron font-extrabold text-2xl text-gray-200">
+                MERKURIUS // TELEMETRI SKILLS
+              </div>
+              <div class="font-mono text-xs text-gray-400">
+                SEKTOR [1]: REVOLUSI TERCEPAT & TECH MATRIX
+              </div>
+            </div>
+          </div>
+          <button
+            class="close-modal-btn p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-gray-200 font-mono text-xs flex items-center gap-2 transition-all"
+          >
+            <span>Kembali ke Tata Surya</span>
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div
+            class="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3"
+          >
+            <div class="flex justify-between font-mono text-xs">
+              <span class="text-gray-300">Three.js & WebGL Shaders</span>
+              <span class="text-cyan-400 font-bold">95%</span>
+            </div>
+            <div class="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+              <div
+                class="bg-cyan-400 h-full rounded-full"
+                style="width: 95%"
+              ></div>
+            </div>
+          </div>
+
+          <div
+            class="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3"
+          >
+            <div class="flex justify-between font-mono text-xs">
+              <span class="text-gray-300"
+                >Interactive UI/UX & Figma Systems</span
+              >
+              <span class="text-amber-400 font-bold">98%</span>
+            </div>
+            <div class="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+              <div
+                class="bg-amber-400 h-full rounded-full"
+                style="width: 98%"
+              ></div>
+            </div>
+          </div>
+
+          <div
+            class="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3"
+          >
+            <div class="flex justify-between font-mono text-xs">
+              <span class="text-gray-300"
+                >Motion Physics & Microinteractions</span
+              >
+              <span class="text-red-400 font-bold">92%</span>
+            </div>
+            <div class="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+              <div
+                class="bg-red-400 h-full rounded-full"
+                style="width: 92%"
+              ></div>
+            </div>
+          </div>
+
+          <div
+            class="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3"
+          >
+            <div class="flex justify-between font-mono text-xs">
+              <span class="text-gray-300">Web Audio API Soundscapes</span>
+              <span class="text-emerald-400 font-bold">88%</span>
+            </div>
+            <div class="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+              <div
+                class="bg-emerald-400 h-full rounded-full"
+                style="width: 88%"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 3: VENUS (VENUS / MASTERPIECES) -->
+    <div
+      id="modal-VENUS"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md"
+    >
+      <div
+        class="hud-glass rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-10 border border-yellow-500/40 shadow-2xl relative"
+      >
+        <div
+          class="flex items-center justify-between border-b border-yellow-500/30 pb-4 mb-6"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-black font-black text-lg"
+            >
+              <i class="fa-solid fa-gem"></i>
+            </div>
+            <div>
+              <div
+                class="font-orbitron font-extrabold text-2xl text-yellow-300"
+              >
+                VENUS // MASTERPIECES SHOWCASE
+              </div>
+              <div class="font-mono text-xs text-yellow-100/70">
+                SEKTOR [2]: KARYA ESTETIKA ATMOSFERIK TINGGI
+              </div>
+            </div>
+          </div>
+          <button
+            class="close-modal-btn p-2.5 rounded-xl bg-yellow-500/20 hover:bg-yellow-500/40 text-yellow-300 font-mono text-xs flex items-center gap-2 transition-all"
+          >
+            <span>Kembali ke Tata Surya</span>
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div
+            class="p-5 rounded-2xl bg-white/5 border border-yellow-500/30 hover:border-yellow-400 transition-all group"
+          >
+            <div
+              class="h-48 rounded-xl bg-slate-900 border border-white/10 overflow-hidden mb-4 relative"
+            >
+              <img
+                src="https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=800&q=80"
+                alt="Venus Work 1"
+                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              />
+            </div>
+            <h4
+              class="font-syne font-bold text-lg text-white group-hover:text-yellow-300"
+            >
+              LUMINA SPATIAL GLASS UI
+            </h4>
+            <p class="text-xs text-gray-400 mt-1">
+              Antarmuka glassmorphism spasial dengan refleksifitas dinamis.
+            </p>
+          </div>
+
+          <div
+            class="p-5 rounded-2xl bg-white/5 border border-yellow-500/30 hover:border-yellow-400 transition-all group"
+          >
+            <div
+              class="h-48 rounded-xl bg-slate-900 border border-white/10 overflow-hidden mb-4 relative"
+            >
+              <img
+                src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80"
+                alt="Venus Work 2"
+                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              />
+            </div>
+            <h4
+              class="font-syne font-bold text-lg text-white group-hover:text-yellow-300"
+            >
+              VENUSIAN KINETIC TYPOGRAPHY
+            </h4>
+            <p class="text-xs text-gray-400 mt-1">
+              Sistem tipografi gerak interaktif dengan kontrol sudut kemiringan.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 4: BUMI (EARTH / PROJECTS PORTFOLIO) -->
+    <div
+      id="modal-BUMI"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md"
+    >
+      <div
+        class="hud-glass rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-10 border border-blue-500/40 shadow-2xl relative"
+      >
+        <div
+          class="flex items-center justify-between border-b border-blue-500/30 pb-4 mb-6"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-black font-black text-lg"
+            >
+              <i class="fa-solid fa-earth-americas"></i>
+            </div>
+            <div>
+              <div class="font-orbitron font-extrabold text-2xl text-blue-400">
+                BUMI // CASE STUDIES PORTFOLIO
+              </div>
+              <div class="font-mono text-xs text-blue-200/70">
+                SEKTOR [3]: PORTOFOLIO UTAMA BUMI & APLIKASI WEB
+              </div>
+            </div>
+          </div>
+          <button
+            class="close-modal-btn p-2.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 font-mono text-xs flex items-center gap-2 transition-all"
+          >
+            <span>Kembali ke Tata Surya</span>
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div
+            class="p-4 rounded-2xl bg-white/5 border border-blue-500/20 hover:border-blue-400 transition-all"
+          >
+            <img
+              src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=600&q=80"
+              class="w-full h-40 object-cover rounded-xl mb-3"
+            />
+            <div class="font-mono text-[10px] text-blue-400 font-bold">
+              REACT / THREE.JS
+            </div>
+            <h5 class="font-syne font-bold text-white text-base my-1">
+              AURA SPATIAL DASHBOARD
+            </h5>
+            <p class="text-gray-400 text-xs">
+              Monitoring data geospasial real-time berbasis 3D planet.
+            </p>
+          </div>
+
+          <div
+            class="p-4 rounded-2xl bg-white/5 border border-blue-500/20 hover:border-blue-400 transition-all"
+          >
+            <img
+              src="https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80"
+              class="w-full h-40 object-cover rounded-xl mb-3"
+            />
+            <div class="font-mono text-[10px] text-cyan-400 font-bold">
+              CANVAS / WEB AUDIO
+            </div>
+            <h5 class="font-syne font-bold text-white text-base my-1">
+              NEBULA FREQUENCY SYNTH
+            </h5>
+            <p class="text-gray-400 text-xs">
+              Generator gelombang suara interaktif visual audio.
+            </p>
+          </div>
+
+          <div
+            class="p-4 rounded-2xl bg-white/5 border border-blue-500/20 hover:border-blue-400 transition-all"
+          >
+            <img
+              src="https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=600&q=80"
+              class="w-full h-40 object-cover rounded-xl mb-3"
+            />
+            <div class="font-mono text-[10px] text-amber-400 font-bold">
+              FIGMA / SYSTEM
+            </div>
+            <h5 class="font-syne font-bold text-white text-base my-1">
+              QUANTUM HUD SYSTEM
+            </h5>
+            <p class="text-gray-400 text-xs">
+              Panduan sistem desain antarmuka ruang angkasa.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 5: MARS (MARS / MOTION PLAYGROUND) -->
+    <div
+      id="modal-MARS"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md"
+    >
+      <div
+        class="hud-glass rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-10 border border-red-500/40 shadow-2xl relative"
+      >
+        <div
+          class="flex items-center justify-between border-b border-red-500/30 pb-4 mb-6"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-black font-black text-lg"
+            >
+              <i class="fa-solid fa-atom"></i>
+            </div>
+            <div>
+              <div class="font-orbitron font-extrabold text-2xl text-red-400">
+                MARS // MOTION PLAYGROUND
+              </div>
+              <div class="font-mono text-xs text-red-200/70">
+                SEKTOR [4]: LAB EKSPERIMEN FISIKA & SIMULASI ANIMASI
+              </div>
+            </div>
+          </div>
+          <button
+            class="close-modal-btn p-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/40 text-red-300 font-mono text-xs flex items-center gap-2 transition-all"
+          >
+            <span>Kembali ke Tata Surya</span>
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <div
+          class="p-6 rounded-2xl bg-black/60 border border-red-500/30 text-center"
+        >
+          <i
+            class="fa-solid fa-volcano text-5xl text-red-400 mb-3 animate-bounce"
+          ></i>
+          <h4 class="font-syne font-bold text-xl text-white">
+            LABORATORIUM FISIKA MARS AKTIF
+          </h4>
+          <p class="text-gray-300 text-xs max-w-lg mx-auto mt-2 font-mono">
+            Eksperimen animasi gerak dinamis dengan modul respon gravitasi
+            partikel dan sintesis gelombang audio.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 6: YUPITER (JUPITER / CAREER HISTORY) -->
+    <div
+      id="modal-YUPITER"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md"
+    >
+      <div
+        class="hud-glass rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-10 border border-orange-500/40 shadow-2xl relative"
+      >
+        <div
+          class="flex items-center justify-between border-b border-orange-500/30 pb-4 mb-6"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center text-black font-black text-lg"
+            >
+              <i class="fa-solid fa-timeline"></i>
+            </div>
+            <div>
+              <div
+                class="font-orbitron font-extrabold text-2xl text-orange-400"
+              >
+                YUPITER // REKAM KARIR & LINTASAN
+              </div>
+              <div class="font-mono text-xs text-orange-200/70">
+                SEKTOR [5]: PLANET TERBESAR & EXP TIMELINE
+              </div>
+            </div>
+          </div>
+          <button
+            class="close-modal-btn p-2.5 rounded-xl bg-orange-500/20 hover:bg-orange-500/40 text-orange-300 font-mono text-xs flex items-center gap-2 transition-all"
+          >
+            <span>Kembali ke Tata Surya</span>
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <div class="space-y-6 font-mono text-xs">
+          <div class="p-4 rounded-xl bg-white/5 border-l-4 border-orange-500">
+            <div class="text-orange-400 font-bold">2023 - SEKARANG</div>
+            <div class="text-white text-base font-syne font-bold my-1">
+              LEAD SPATIAL DESIGNER // ORBIT LABS
+            </div>
+            <p class="text-gray-400">
+              Memimpin tim visual dalam pembuatan produk antarmuka 3D WebGL.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-white/5 border-l-4 border-amber-500">
+            <div class="text-amber-400 font-bold">2020 - 2023</div>
+            <div class="text-white text-base font-syne font-bold my-1">
+              SENIOR UI/UX MOTION ARTIST // NEBULA INC
+            </div>
+            <p class="text-gray-400">
+              Mengembangkan microinteractions dan desain sistem aplikasi skala
+              besar.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 7: SATURNUS (SATURN / RING PHYSICS SIMULATOR) -->
+    <div
+      id="modal-SATURNUS"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md"
+    >
+      <div
+        class="hud-glass rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-10 border border-yellow-400/40 shadow-2xl relative"
+      >
+        <div
+          class="flex items-center justify-between border-b border-yellow-500/30 pb-4 mb-6"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center text-black font-black text-lg"
+            >
+              <i class="fa-solid fa-ring"></i>
+            </div>
+            <div>
+              <div
+                class="font-orbitron font-extrabold text-2xl text-yellow-300"
+              >
+                SATURNUS // RING PHYSICS SIMULATOR
+              </div>
+              <div class="font-mono text-xs text-yellow-100/70">
+                SEKTOR [6]: SIMULASI CINCIN & PARTIKEL DEBU
+              </div>
+            </div>
+          </div>
+          <button
+            class="close-modal-btn p-2.5 rounded-xl bg-yellow-500/20 hover:bg-yellow-500/40 text-yellow-300 font-mono text-xs flex items-center gap-2 transition-all"
+          >
+            <span>Kembali ke Tata Surya</span>
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <div
+          class="p-6 rounded-2xl bg-black/80 border border-yellow-500/30 text-center"
+        >
+          <i
+            class="fa-solid fa-compact-disc text-5xl text-yellow-400 mb-3 animate-spin"
+          ></i>
+          <h4 class="font-syne font-bold text-xl text-white">
+            SIMULATOR LINGKARAN CINCIN SATURNUS
+          </h4>
+          <p class="text-gray-300 text-xs max-w-lg mx-auto mt-2 font-mono">
+            Lintasan cincin Saturnus terdiri dari jutaan partikel es dan batuan
+            yang mengorbit secara presisi.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 8: NEPTUNUS (NEPTUNE / CONTACT STATION) -->
+    <div
+      id="modal-NEPTUNUS"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md"
+    >
+      <div
+        class="hud-glass rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-10 border border-cyan-500/40 shadow-2xl relative"
+      >
+        <div
+          class="flex items-center justify-between border-b border-cyan-500/30 pb-4 mb-6"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-full bg-cyan-400 flex items-center justify-center text-black font-black text-lg"
+            >
+              <i class="fa-solid fa-satellite-dish"></i>
+            </div>
+            <div>
+              <div class="font-orbitron font-extrabold text-2xl text-cyan-300">
+                NEPTUNUS // SIGNAL TRANSMISSION HUB
+              </div>
+              <div class="font-mono text-xs text-cyan-100/70">
+                SEKTOR [7]: PLANET TERLUAR & HUB KONTAK INTERSTELAR
+              </div>
+            </div>
+          </div>
+          <button
+            class="close-modal-btn p-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 font-mono text-xs flex items-center gap-2 transition-all"
+          >
+            <span>Kembali ke Tata Surya</span>
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <!-- Form Transmisi -->
+        <form id="contact-form" class="space-y-4 font-mono">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1"
+              >NAMA ASTRONOT / IDENTITAS:</label
+            >
+            <input
+              type="text"
+              required
+              class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-400"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1"
+              >ALAMAT FREKUENSI EMAIL:</label
+            >
+            <input
+              type="email"
+              required
+              class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-400"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1"
+              >PESAN TRANSMISI SINYAL:</label
+            >
+            <textarea
+              rows="4"
+              required
+              class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-400 resize-none"
+            ></textarea>
+          </div>
+          <button
+            type="submit"
+            id="contact-submit"
+            class="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-500 to-amber-500 text-black font-extrabold font-syne text-sm hover:shadow-[0_0_25px_rgba(6,182,212,0.6)] transition-all"
+          >
+            KIRIM TRANSMISI SINYAL NEPTUNUS
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <script src="./assets/orbit.js"></script>
   </body>
 </html>
