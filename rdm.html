@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RDM Enterprise - Unified Remote Device Management</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        navy: {
+                            50: '#f0f4f8',
+                            100: '#d9e2ec',
+                            200: '#bcccdc',
+                            300: '#9fb3c8',
+                            400: '#829ab1',
+                            500: '#627d98',
+                            600: '#486581',
+                            700: '#334e68',
+                            800: '#1E3E62',
+                            900: '#0B192C',
+                            950: '#060e1a',
+                        },
+                        accent: {
+                            blue: '#008BFF',
+                            hover: '#0077DB'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .canvas-grid {
+            background-color: #060e1a;
+            background-image: radial-gradient(#1e3a66 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        .cursor-remote {
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col overflow-hidden select-none">
+
+    <!-- TOP PERSISTENT NAVBAR -->
+    <header class="h-14 bg-navy-900 border-b border-navy-800 text-white flex items-center justify-between px-4 z-30 shrink-0 shadow-md">
+        <!-- Brand & Workspace Indicator -->
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-lg bg-accent-blue flex items-center justify-center font-bold text-white shadow-md shadow-accent-blue/30">
+                    <i class="fa-solid fa-network-wired text-sm"></i>
+                </div>
+                <div>
+                    <span class="font-bold text-sm tracking-wide text-white block leading-none">RDM ENTERPRISE</span>
+                    <span class="text-[10px] text-blue-300 font-mono">v5.2 Static Prototype</span>
+                </div>
+            </div>
+
+            <span class="text-navy-700 hidden sm:inline">|</span>
+
+            <!-- Zoom Controls -->
+            <div class="hidden sm:flex items-center space-x-1.5 bg-navy-950/80 rounded-lg p-1 border border-navy-800 text-xs">
+                <button onclick="zoomCanvas(0.05)" class="p-1 hover:bg-navy-800 rounded text-slate-300 hover:text-white" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                <span id="zoom-label" class="font-mono text-[11px] text-blue-200 px-1">100%</span>
+                <button onclick="zoomCanvas(-0.05)" class="p-1 hover:bg-navy-800 rounded text-slate-300 hover:text-white" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                <button onclick="resetZoom()" class="p-1 hover:bg-navy-800 rounded text-slate-300 hover:text-white" title="Reset Zoom"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
+        </div>
+
+        <!-- Center Active Target Status -->
+        <div class="hidden lg:flex items-center space-x-3 bg-navy-950 px-3 py-1.5 rounded-lg border border-navy-800 text-xs font-mono">
+            <span class="text-slate-400">ACTIVE TARGET:</span>
+            <span class="flex items-center text-emerald-400 font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+                PROD-WIN-NODE-01 (192.168.10.45)
+            </span>
+            <span class="text-navy-700">|</span>
+            <span class="text-blue-300">WebRTC P2P (8ms RTT)</span>
+        </div>
+
+        <!-- Right Quick Actions & Profile -->
+        <div class="flex items-center space-x-3 text-xs">
+            <button onclick="toggleDrawer('inspect-drawer')" class="px-3 py-1.5 bg-navy-800 hover:bg-navy-700 text-blue-200 hover:text-white rounded-lg border border-navy-700 flex items-center space-x-1.5 font-semibold transition">
+                <i class="fa-solid fa-code text-accent-blue"></i>
+                <span class="hidden md:inline">Inspect Tokens</span>
+            </button>
+            <div class="w-8 h-8 rounded-full bg-accent-blue flex items-center justify-center font-bold text-white border border-blue-300/30">
+                SA
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER WITH PERSISTENT SIDEBAR -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- SIDEBAR NAVIGATION MENU -->
+        <aside class="w-64 bg-navy-900 border-r border-navy-800 flex flex-col justify-between shrink-0 z-20 text-slate-300">
+            <div class="p-3 space-y-1">
+                <div class="px-3 py-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase font-mono">Management Modules</div>
+
+                <!-- 1. Fleet Dashboard & Analytics -->
+                <button onclick="switchTab('mod-fleet')" id="nav-mod-fleet" class="w-full px-3 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-between bg-accent-blue text-white shadow-md transition">
+                    <span class="flex items-center space-x-3">
+                        <i class="fa-solid fa-chart-pie text-sm"></i>
+                        <span>1. Fleet Analytics</span>
+                    </span>
+                    <span class="px-2 py-0.5 rounded-full bg-blue-900/60 text-[10px] font-mono">1,248</span>
+                </button>
+
+                <!-- 2. Remote Desktop -->
+                <button onclick="switchTab('mod-desktop')" id="nav-mod-desktop" class="w-full px-3 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-between text-slate-300 hover:bg-navy-800 hover:text-white transition">
+                    <span class="flex items-center space-x-3">
+                        <i class="fa-solid fa-desktop text-sm"></i>
+                        <span>2. Remote Desktop</span>
+                    </span>
+                    <span class="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 text-[10px] border border-emerald-800 font-mono">Wizard</span>
+                </button>
+
+                <!-- 3. Remote Server Management -->
+                <button onclick="switchTab('mod-server')" id="nav-mod-server" class="w-full px-3 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-between text-slate-300 hover:bg-navy-800 hover:text-white transition">
+                    <span class="flex items-center space-x-3">
+                        <i class="fa-solid fa-server text-sm"></i>
+                        <span>3. Remote Server Mgmt</span>
+                    </span>
+                    <span class="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 text-[10px] border border-emerald-800 font-mono">Wizard</span>
+                </button>
+
+                <!-- 4. Remote Web Terminal & Shell -->
+                <button onclick="switchTab('mod-shell')" id="nav-mod-shell" class="w-full px-3 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-between text-slate-300 hover:bg-navy-800 hover:text-white transition">
+                    <span class="flex items-center space-x-3">
+                        <i class="fa-solid fa-terminal text-sm"></i>
+                        <span>4. Web Terminal & Shell</span>
+                    </span>
+                    <span class="px-1.5 py-0.5 rounded bg-purple-950 text-purple-400 text-[10px] border border-purple-800 font-mono">PTY</span>
+                </button>
+
+                <!-- 5. Remote Control & Live Screen Viewer -->
+                <button onclick="switchTab('mod-viewer')" id="nav-mod-viewer" class="w-full px-3 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-between text-slate-300 hover:bg-navy-800 hover:text-white transition">
+                    <span class="flex items-center space-x-3">
+                        <i class="fa-solid fa-mobile-screen text-sm"></i>
+                        <span>5. Live Screen & Touch</span>
+                    </span>
+                    <span class="px-1.5 py-0.5 rounded bg-blue-950 text-blue-400 text-[10px] border border-blue-800 font-mono">P2P</span>
+                </button>
+
+                <!-- 6. Software Deployment & Policy Manager -->
+                <button onclick="switchTab('mod-policy')" id="nav-mod-policy" class="w-full px-3 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-between text-slate-300 hover:bg-navy-800 hover:text-white transition">
+                    <span class="flex items-center space-x-3">
+                        <i class="fa-solid fa-box-archive text-sm"></i>
+                        <span>6. Deploy & Policies</span>
+                    </span>
+                </button>
+
+                <div class="px-3 pt-3 text-[10px] font-bold tracking-wider text-slate-400 uppercase font-mono">System & Logs</div>
+
+                <!-- 7. Audit Logs & Security -->
+                <button onclick="switchTab('mod-audit')" id="nav-mod-audit" class="w-full px-3 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-between text-slate-300 hover:bg-navy-800 hover:text-white transition">
+                    <span class="flex items-center space-x-3">
+                        <i class="fa-solid fa-shield-halved text-sm"></i>
+                        <span>7. Audit Logs & Audit</span>
+                    </span>
+                </button>
+
+                <!-- 8. Settings & Configuration -->
+                <button onclick="switchTab('mod-settings')" id="nav-mod-settings" class="w-full px-3 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-between text-slate-300 hover:bg-navy-800 hover:text-white transition">
+                    <span class="flex items-center space-x-3">
+                        <i class="fa-solid fa-sliders text-sm"></i>
+                        <span>8. System Settings</span>
+                    </span>
+                </button>
+            </div>
+
+            <!-- Agent Infrastructure Telemetry Footer -->
+            <div class="p-3 bg-navy-950 border-t border-navy-800 text-xs space-y-1.5 font-mono">
+                <div class="text-[10px] text-slate-400 uppercase font-bold">Relay Infrastructure</div>
+                <div class="flex justify-between items-center text-[11px]">
+                    <span class="text-slate-400">TURN / STUN:</span>
+                    <span class="text-emerald-400 font-bold">Active (0.2ms)</span>
+                </div>
+                <div class="flex justify-between items-center text-[11px]">
+                    <span class="text-slate-400">E2EE Protocol:</span>
+                    <span class="text-blue-300">TLS 1.3 / AES-GCM</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- WORKSPACE VIEWPORT CONTAINER -->
+        <main id="viewport-container" class="flex-1 bg-slate-50 overflow-hidden flex flex-col relative transition-transform origin-top-left">
+
+            <!-- ========================================== -->
+            <!-- MENU 1: FLEET DASHBOARD & ANALYTICS        -->
+            <!-- ========================================== -->
+            <section id="mod-fleet" class="flex-1 p-6 overflow-y-auto space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div>
+                        <h1 class="text-xl font-bold text-navy-900">Fleet Dashboard & Global Analytics</h1>
+                        <p class="text-xs text-slate-500">Real-time multiplatform telemetry, OS share, and active agent health monitoring.</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="triggerNotification('Fleet telemetry refreshed')" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg border border-slate-300">
+                            <i class="fa-solid fa-rotate mr-1"></i> Refresh
+                        </button>
+                        <button onclick="switchTab('mod-policy')" class="px-4 py-2 bg-accent-blue hover:bg-accent-hover text-white font-semibold text-xs rounded-lg shadow-md">
+                            <i class="fa-solid fa-plus mr-1"></i> Enroll Device Agent
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Metric Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500 uppercase">Total Devices</span>
+                            <div class="w-8 h-8 rounded-lg bg-blue-100 text-accent-blue flex items-center justify-center text-sm font-bold"><i class="fa-solid fa-server"></i></div>
+                        </div>
+                        <div class="mt-2 text-2xl font-bold text-navy-900">1,248</div>
+                        <div class="text-[11px] text-emerald-600 font-bold mt-1"><i class="fa-solid fa-circle-check mr-1"></i> 1,228 Online (98.4%)</div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500 uppercase">Avg CPU Load</span>
+                            <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-sm font-bold"><i class="fa-solid fa-microchip"></i></div>
+                        </div>
+                        <div class="mt-2 text-2xl font-bold text-navy-900">32.8%</div>
+                        <div class="text-[11px] text-slate-500 mt-1">Across 8,192 total cores</div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500 uppercase">Bandwidth Rate</span>
+                            <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold"><i class="fa-solid fa-chart-line"></i></div>
+                        </div>
+                        <div class="mt-2 text-2xl font-bold text-navy-900">4.2 GB/s</div>
+                        <div class="text-[11px] text-blue-600 font-bold mt-1"><i class="fa-solid fa-bolt mr-1"></i> WebRTC P2P Accelerated</div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500 uppercase">Security Compliance</span>
+                            <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-sm font-bold"><i class="fa-solid fa-shield-halved"></i></div>
+                        </div>
+                        <div class="mt-2 text-2xl font-bold text-navy-900">99.4%</div>
+                        <div class="text-[11px] text-emerald-600 font-bold mt-1">[✓] E2EE & USB Locks Active</div>
+                    </div>
+                </div>
+
+                <!-- Analytics Graphs -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                        <h3 class="font-bold text-sm text-navy-900 mb-4">Multiplatform OS Share</h3>
+                        <div class="h-56 relative">
+                            <canvas id="chart-os-dist"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                        <h3 class="font-bold text-sm text-navy-900 mb-4">Real-Time Traffic & CPU Telemetry</h3>
+                        <div class="h-56 relative">
+                            <canvas id="chart-fleet-telemetry"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Managed Nodes Table -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                        <h3 class="font-bold text-sm text-navy-900">Managed Target Nodes</h3>
+                        <input type="text" placeholder="Search hostname/IP..." class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-accent-blue">
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+                                <tr>
+                                    <th class="p-3">Device Hostname</th>
+                                    <th class="p-3">Platform OS</th>
+                                    <th class="p-3">IP Address</th>
+                                    <th class="p-3">CPU / RAM</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3 text-right">Quick Access</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr class="hover:bg-slate-50">
+                                    <td class="p-3 font-bold text-navy-900">PROD-WIN-NODE-01</td>
+                                    <td class="p-3"><i class="fa-brands fa-windows text-blue-500 mr-1.5"></i> Windows Server 2025</td>
+                                    <td class="p-3 font-mono">192.168.10.45</td>
+                                    <td class="p-3 font-mono text-slate-600">28% / 12.4 GB</td>
+                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold text-[10px]">ONLINE</span></td>
+                                    <td class="p-3 text-right space-x-2">
+                                        <button onclick="switchTab('mod-desktop')" class="px-2.5 py-1 bg-accent-blue text-white rounded font-semibold text-[11px]">Desktop</button>
+                                        <button onclick="switchTab('mod-shell')" class="px-2.5 py-1 bg-purple-600 text-white rounded font-semibold text-[11px]">Shell</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-slate-50">
+                                    <td class="p-3 font-bold text-navy-900">SRV-UBUNTU-PROD-02</td>
+                                    <td class="p-3"><i class="fa-brands fa-ubuntu text-orange-500 mr-1.5"></i> Ubuntu 24.04 LTS</td>
+                                    <td class="p-3 font-mono">10.0.4.12</td>
+                                    <td class="p-3 font-mono text-slate-600">14% / 4.1 GB</td>
+                                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold text-[10px]">ONLINE</span></td>
+                                    <td class="p-3 text-right space-x-2">
+                                        <button onclick="switchTab('mod-server')" class="px-2.5 py-1 bg-emerald-600 text-white rounded font-semibold text-[11px]">Server</button>
+                                        <button onclick="switchTab('mod-shell')" class="px-2.5 py-1 bg-purple-600 text-white rounded font-semibold text-[11px]">Shell</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================== -->
+            <!-- MENU 2: REMOTE DESKTOP (+ FORM WIZARD)     -->
+            <!-- ========================================== -->
+            <section id="mod-desktop" class="hidden flex-1 flex flex-col bg-slate-900 text-white overflow-hidden">
+                <!-- Session Active Bar -->
+                <div class="h-12 bg-navy-900 border-b border-navy-800 px-4 flex items-center justify-between text-xs z-20 shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <span class="font-bold font-mono text-accent-blue">PROD-WIN-NODE-01</span>
+                        <div class="flex items-center bg-navy-950 rounded p-1 border border-navy-800">
+                            <span class="text-[10px] text-slate-400 px-2 font-semibold">MONITOR:</span>
+                            <button onclick="switchMonitor(1)" id="btn-desktop-mon-1" class="px-2 py-0.5 rounded text-xs font-bold bg-accent-blue text-white">Display 1</button>
+                            <button onclick="switchMonitor(2)" id="btn-desktop-mon-2" class="px-2 py-0.5 rounded text-xs font-medium text-slate-400 hover:text-white">Display 2</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="toggleWizardView('desktop-wizard-box', 'desktop-workspace-box')" class="px-3 py-1 bg-navy-800 hover:bg-navy-700 text-blue-200 rounded border border-navy-700 flex items-center space-x-1 font-semibold">
+                            <i class="fa-solid fa-sliders text-accent-blue"></i>
+                            <span>Re-configure (Wizard)</span>
+                        </button>
+                        <button onclick="triggerNotification('Ctrl+Alt+Del Sent')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded font-semibold">Ctrl+Alt+Del</button>
+                    </div>
+                </div>
+
+                <!-- Content Area: Wizard vs Workspace -->
+                <div class="flex-1 relative overflow-hidden flex items-center justify-center p-4">
+
+                    <!-- DEDICATED FORM WIZARD (REMOTE DESKTOP) -->
+                    <div id="desktop-wizard-box" class="w-full max-w-2xl bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 p-6 z-30 space-y-6">
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+                            <div>
+                                <h2 class="text-lg font-bold text-navy-900 flex items-center"><i class="fa-solid fa-desktop text-accent-blue mr-2"></i> Remote Desktop Connection Wizard</h2>
+                                <p class="text-xs text-slate-500">Set up session parameters, display profiles, and security keys.</p>
+                            </div>
+                            <span class="px-2.5 py-1 bg-blue-50 text-accent-blue border border-blue-200 rounded font-mono text-xs font-bold">RDM-RDP v2.4</span>
+                        </div>
+
+                        <!-- Stepper -->
+                        <div class="flex items-center justify-between text-xs font-semibold px-4">
+                            <div id="desktop-step-1" class="flex items-center space-x-2 text-accent-blue">
+                                <span class="w-6 h-6 rounded-full bg-accent-blue text-white flex items-center justify-center text-xs font-bold">1</span>
+                                <span>Target & Display</span>
+                            </div>
+                            <div class="flex-1 h-0.5 bg-slate-200 mx-3"></div>
+                            <div id="desktop-step-2" class="flex items-center space-x-2 text-slate-400">
+                                <span class="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">2</span>
+                                <span>Auth & E2EE</span>
+                            </div>
+                        </div>
+
+                        <!-- Step 1 Inputs -->
+                        <div id="desktop-step-1-content" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Target Node Host / IP</label>
+                                    <input type="text" value="192.168.10.45 (PROD-WIN-NODE-01)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:border-accent-blue focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Display Profile Resolution</label>
+                                    <select class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:border-accent-blue focus:outline-none">
+                                        <option>1920x1080 @ 60 FPS (1080p Ultra)</option>
+                                        <option>2560x1440 @ 60 FPS (2K QHD)</option>
+                                        <option>1366x768 @ 30 FPS (Low Bandwidth)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center pt-2">
+                                <button onclick="runPingTest('desktop-ping')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs rounded-lg font-bold"><i class="fa-solid fa-bolt text-amber-500 mr-1"></i> Test Ping</button>
+                                <span id="desktop-ping" class="text-xs font-mono text-emerald-600 font-bold">Latency: 8ms (P2P WebRTC)</span>
+                                <button onclick="nextWizardStep('desktop', 2)" class="px-4 py-2 bg-accent-blue hover:bg-accent-hover text-white text-xs rounded-lg font-bold">Next: Auth & Keys <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- Step 2 Inputs -->
+                        <div id="desktop-step-2-content" class="hidden space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">E2EE Pairing Password</label>
+                                    <input type="password" value="••••••••••••" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:border-accent-blue focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Video Stream Encoding</label>
+                                    <select class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:border-accent-blue focus:outline-none">
+                                        <option>H.264 Hardware Accelerated</option>
+                                        <option>VP8 Software Codec</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center pt-2">
+                                <button onclick="nextWizardStep('desktop', 1)" class="px-3 py-1.5 bg-slate-100 text-slate-700 text-xs rounded-lg font-bold"><i class="fa-solid fa-arrow-left mr-1"></i> Back</button>
+                                <button onclick="launchSessionWorkspace('desktop-wizard-box', 'desktop-workspace-box')" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg font-bold shadow-lg"><i class="fa-solid fa-plug mr-1.5"></i> Connect Desktop Session</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LIVE DESKTOP WORKSPACE (Connected) -->
+                    <div id="desktop-workspace-box" class="hidden w-full h-full max-w-[1300px] max-h-[720px] bg-slate-950 rounded-xl border border-slate-700 shadow-2xl flex flex-col relative overflow-hidden">
+                        <div class="flex-1 canvas-grid relative p-6 cursor-remote select-none flex flex-col justify-between">
+                            <div class="space-y-4 w-24">
+                                <div class="flex flex-col items-center group p-2 rounded hover:bg-white/10">
+                                    <i class="fa-solid fa-server text-accent-blue text-3xl"></i>
+                                    <span class="text-[10px] text-white mt-1">Server Mgr</span>
+                                </div>
+                                <div class="flex flex-col items-center group p-2 rounded hover:bg-white/10">
+                                    <i class="fa-solid fa-terminal text-purple-400 text-3xl"></i>
+                                    <span class="text-[10px] text-white mt-1">PowerShell</span>
+                                </div>
+                            </div>
+
+                            <div id="remote-pointer-desktop" class="absolute top-1/3 left-1/2 text-accent-blue text-lg pointer-events-none transition-all duration-700">
+                                <i class="fa-solid fa-arrow-pointer"></i>
+                            </div>
+
+                            <div class="h-10 bg-slate-950/90 border border-slate-800 rounded-lg px-4 flex items-center justify-between text-xs backdrop-blur-md">
+                                <div class="flex items-center space-x-3 text-accent-blue">
+                                    <i class="fa-brands fa-windows text-base"></i>
+                                    <i class="fa-solid fa-terminal text-white"></i>
+                                </div>
+                                <span class="font-mono text-slate-400 text-[11px]">10:45 AM - Windows Server 2025</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================== -->
+            <!-- MENU 3: REMOTE SERVER MANAGEMENT (+ WIZARD)-->
+            <!-- ========================================== -->
+            <section id="mod-server" class="hidden flex-1 flex flex-col bg-slate-900 text-white overflow-hidden">
+                <div class="h-12 bg-navy-900 border-b border-navy-800 px-4 flex items-center justify-between text-xs z-20 shrink-0">
+                    <span class="font-bold font-mono text-emerald-400"><i class="fa-solid fa-server mr-2"></i>SRV-UBUNTU-PROD-02 (Systemd & Process Manager)</span>
+                    <button onclick="toggleWizardView('server-wizard-box', 'server-workspace-box')" class="px-3 py-1 bg-navy-800 hover:bg-navy-700 text-blue-200 rounded border border-navy-700 flex items-center space-x-1 font-semibold">
+                        <i class="fa-solid fa-sliders text-accent-blue"></i>
+                        <span>Re-configure (Wizard)</span>
+                    </button>
+                </div>
+
+                <div class="flex-1 relative overflow-hidden flex items-center justify-center p-6">
+
+                    <!-- DEDICATED FORM WIZARD (REMOTE SERVER) -->
+                    <div id="server-wizard-box" class="w-full max-w-2xl bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 p-6 z-30 space-y-6">
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+                            <div>
+                                <h2 class="text-lg font-bold text-navy-900 flex items-center"><i class="fa-solid fa-server text-emerald-600 mr-2"></i> Remote Server Management Wizard</h2>
+                                <p class="text-xs text-slate-500">Configure SSH/gRPC credentials, sudo rights, and service polling interval.</p>
+                            </div>
+                            <span class="px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded font-mono text-xs font-bold">Direct Agent API</span>
+                        </div>
+
+                        <div id="server-step-1-content" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Server Host IP / SSH Port</label>
+                                    <input type="text" value="10.0.4.12:22 (SRV-UBUNTU-PROD-02)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1">Authentication Method</label>
+                                    <select class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none">
+                                        <option>RSA 4096 Key Pair (Auto-Injected)</option>
+                                        <option>Sudo Password Credential</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center pt-2">
+                                <span class="text-xs text-slate-500 font-mono">[✓] Systemd Bus Access Authorized</span>
+                                <button onclick="launchSessionWorkspace('server-wizard-box', 'server-workspace-box')" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg font-bold shadow-lg"><i class="fa-solid fa-bolt mr-1.5"></i> Launch Server Manager</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LIVE SERVER MANAGEMENT WORKSPACE -->
+                    <div id="server-workspace-box" class="hidden w-full h-full max-w-5xl bg-slate-950 rounded-xl border border-slate-800 p-6 overflow-y-auto space-y-6">
+                        <!-- Server Specs Header -->
+                        <div class="grid grid-cols-3 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800 text-xs">
+                            <div><span class="text-slate-400 block">OS & Kernel:</span><span class="font-bold text-white">Ubuntu 24.04 LTS (Linux 6.8.0)</span></div>
+                            <div><span class="text-slate-400 block">System Uptime:</span><span class="font-bold text-emerald-400">42 Days, 14 Hours</span></div>
+                            <div><span class="text-slate-400 block">Systemd Manager:</span><span class="font-bold text-blue-400">Active (v255.4)</span></div>
+                        </div>
+
+                        <!-- Systemd Services Control Table -->
+                        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+                            <div class="p-3 bg-slate-800/80 border-b border-slate-700 font-bold text-xs text-white flex justify-between items-center">
+                                <span><i class="fa-solid fa-gears text-emerald-400 mr-2"></i>System Services Manager (systemd)</span>
+                                <span class="text-[10px] text-slate-400 font-mono">3 Active Managed Services</span>
+                            </div>
+                            <div class="divide-y divide-slate-800 text-xs">
+                                <div class="p-3 flex items-center justify-between">
+                                    <div>
+                                        <div class="font-bold text-white">nginx.service (Web Reverse Proxy)</div>
+                                        <div class="text-[10px] text-slate-400 font-mono">PID: 1204 | Memory: 32 MB</div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span id="status-nginx" class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold text-[10px]">RUNNING</span>
+                                        <button onclick="toggleService('nginx')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded font-bold text-[11px]">Restart</button>
+                                    </div>
+                                </div>
+                                <div class="p-3 flex items-center justify-between">
+                                    <div>
+                                        <div class="font-bold text-white">postgresql.service (Primary Database)</div>
+                                        <div class="text-[10px] text-slate-400 font-mono">PID: 3892 | Memory: 1.2 GB</div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span id="status-postgresql" class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold text-[10px]">RUNNING</span>
+                                        <button onclick="toggleService('postgresql')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded font-bold text-[11px]">Restart</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================== -->
+            <!-- MENU 4: REMOTE WEB TERMINAL & SHELL        -->
+            <!-- ========================================== -->
+            <section id="mod-shell" class="hidden flex-1 bg-black text-slate-200 p-6 flex flex-col font-mono text-xs overflow-hidden">
+                <div class="bg-navy-900 p-3 rounded-t-xl border-t border-x border-navy-800 flex justify-between items-center text-slate-300 shrink-0">
+                    <span class="font-bold flex items-center text-purple-400"><i class="fa-solid fa-terminal mr-2"></i>Interactive Pseudo-Terminal (PTY Session)</span>
+                    <button onclick="toggleWizardView('shell-wizard-box', 'shell-workspace-box')" class="px-3 py-1 bg-navy-800 hover:bg-navy-700 text-blue-200 rounded border border-navy-700 text-[11px] font-semibold">
+                        <i class="fa-solid fa-sliders text-accent-blue mr-1"></i> Form Wizard
+                    </button>
+                </div>
+
+                <div id="shell-wizard-box" class="flex-1 bg-slate-950 border border-slate-800 p-6 flex items-center justify-center">
+                    <div class="w-full max-w-xl bg-white text-slate-800 rounded-2xl shadow-2xl p-6 space-y-4">
+                        <h2 class="text-lg font-bold text-navy-900 border-b border-slate-100 pb-3"><i class="fa-solid fa-terminal text-purple-600 mr-2"></i> Web Shell Session Setup</h2>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Target Shell Engine</label>
+                            <select class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                                <option>PowerShell 7 (pwsh.exe)</option>
+                                <option>Bash Shell (/bin/bash)</option>
+                                <option>Zsh Shell (/bin/zsh)</option>
+                            </select>
+                        </div>
+                        <button onclick="launchSessionWorkspace('shell-wizard-box', 'shell-workspace-box')" class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs"><i class="fa-solid fa-play mr-1"></i> Start Terminal Session</button>
+                    </div>
+                </div>
+
+                <div id="shell-workspace-box" class="hidden flex-1 bg-slate-950 border border-slate-800 p-4 flex flex-col overflow-hidden">
+                    <!-- Command Pills for Fast Testing -->
+                    <div class="flex items-center space-x-2 mb-3 pb-2 border-b border-slate-800">
+                        <span class="text-slate-500 text-[10px]">QUICK COMMANDS:</span>
+                        <button onclick="runQuickCommand('sysinfo')" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded text-[10px]">sysinfo</button>
+                        <button onclick="runQuickCommand('top')" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded text-[10px]">top</button>
+                        <button onclick="runQuickCommand('ufw status')" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded text-[10px]">ufw status</button>
+                    </div>
+
+                    <div id="shell-logs" class="flex-1 overflow-y-auto space-y-2 text-slate-300">
+                        <div class="text-slate-500">RDM WebShell Terminal Tunnel initialized (TLS 1.3 / WSS). Type 'help' or click quick command pills above.</div>
+                        <div class="text-purple-400">PS C:\Windows\System32> rdm-agent status</div>
+                        <div class="text-emerald-400">[✓] Daemon Status: RUNNING (Go Runtime v1.23)</div>
+                    </div>
+
+                    <div class="mt-2 pt-2 border-t border-slate-800 flex items-center space-x-2">
+                        <span class="text-purple-400 font-bold">PS C:\Windows\System32></span>
+                        <input type="text" id="shell-input" onkeydown="handleShellInput(event)" class="flex-1 bg-transparent text-white focus:outline-none font-mono text-xs" placeholder="Type command (e.g. sysinfo, top, ufw status, clear)...">
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================== -->
+            <!-- MENU 5: REMOTE CONTROL & LIVE VIEWER      -->
+            <!-- ========================================== -->
+            <section id="mod-viewer" class="hidden flex-1 bg-slate-900 p-6 flex flex-col items-center justify-center overflow-y-auto">
+                <div class="w-full max-w-md bg-slate-950 rounded-3xl border-4 border-slate-700 shadow-2xl p-4 flex flex-col items-center space-y-4">
+                    <div class="w-full flex justify-between items-center text-xs text-slate-400 font-mono px-2">
+                        <span class="flex items-center text-emerald-400"><i class="fa-solid fa-wifi mr-1"></i> WebRTC Stream</span>
+                        <button onclick="toggleWizardView('viewer-wizard-box', 'viewer-workspace-box')" class="text-accent-blue font-bold">Wizard</button>
+                    </div>
+
+                    <div id="viewer-wizard-box" class="w-full bg-white text-slate-800 rounded-2xl p-5 space-y-4">
+                        <h3 class="font-bold text-sm text-navy-900 border-b border-slate-100 pb-2">Mobile Control Wizard</h3>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 mb-1">Device OTP Passcode</label>
+                            <input type="text" value="882-910" class="w-full px-3 py-1.5 border border-slate-300 rounded text-xs font-mono">
+                        </div>
+                        <button onclick="launchSessionWorkspace('viewer-wizard-box', 'viewer-workspace-box')" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-xs">Start Mobile Live View</button>
+                    </div>
+
+                    <div id="viewer-workspace-box" class="hidden w-full h-[500px] bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl border border-slate-800 relative flex flex-col justify-between p-4 cursor-pointer">
+                        <div class="flex justify-between items-center text-xs text-white">
+                            <span>09:41</span>
+                            <div class="flex space-x-1"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-battery-full"></i></div>
+                        </div>
+                        <div class="bg-blue-600/20 border border-blue-500/40 p-4 rounded-xl text-center space-y-2 text-white">
+                            <i class="fa-solid fa-shield-halved text-3xl text-accent-blue"></i>
+                            <div class="font-bold text-sm">RDM Touch Injection Active</div>
+                            <div class="text-[11px] text-blue-200">Android 14 Enterprise Stream</div>
+                        </div>
+                        <div class="text-center text-[10px] text-slate-500 font-mono">Touch gestures dispatched to kernel API</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================== -->
+            <!-- MENU 6: SOFTWARE DEPLOYMENT & POLICIES    -->
+            <!-- ========================================== -->
+            <section id="mod-policy" class="hidden flex-1 p-6 overflow-y-auto space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-navy-900">Software Deployment & Security Policy Manager</h2>
+                        <p class="text-xs text-slate-500">Distribute package installers (.deb, .msi, .apk) & enforce security rules.</p>
+                    </div>
+                    <button onclick="triggerNotification('Package Deployment Wizard Opened')" class="px-4 py-2 bg-accent-blue hover:bg-accent-hover text-white font-semibold text-xs rounded-lg shadow">
+                        <i class="fa-solid fa-upload mr-1.5"></i> Deploy New Package
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <h3 class="font-bold text-sm text-navy-900 border-b border-slate-100 pb-3">Global Security Policies</h3>
+                        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <div>
+                                <div class="font-bold text-xs text-navy-900">Block USB Storage Mass Media</div>
+                                <div class="text-[11px] text-slate-500">Prevent data exfiltration via USB</div>
+                            </div>
+                            <input type="checkbox" checked onchange="triggerNotification('USB Lock policy toggled')" class="w-4 h-4 text-accent-blue rounded">
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <h3 class="font-bold text-sm text-navy-900 border-b border-slate-100 pb-3">Deployment Status</h3>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center">
+                            <div>
+                                <div class="font-bold text-xs text-navy-900">Endpoint Protection v4.2 (.msi)</div>
+                                <div class="text-[11px] text-slate-500">Target: Windows Fleet</div>
+                            </div>
+                            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold text-[10px]">COMPLETED</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================== -->
+            <!-- MENU 7: AUDIT LOGS & SECURITY              -->
+            <!-- ========================================== -->
+            <section id="mod-audit" class="hidden flex-1 p-6 overflow-y-auto space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-navy-900">System Audit Trail & Access Logs</h2>
+                        <p class="text-xs text-slate-500">Immutable session history for security compliance.</p>
+                    </div>
+                    <button onclick="triggerNotification('Audit logs exported to CSV')" class="px-3.5 py-2 bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-300"><i class="fa-solid fa-download mr-1"></i> Export Logs</button>
+                </div>
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+                            <tr>
+                                <th class="p-3">Timestamp</th>
+                                <th class="p-3">Operator</th>
+                                <th class="p-3">Target Node</th>
+                                <th class="p-3">Action Type</th>
+                                <th class="p-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr>
+                                <td class="p-3 font-mono">2026-10-26 15:40:12</td>
+                                <td class="p-3 font-bold">sysadmin_alex</td>
+                                <td class="p-3 font-mono">PROD-WIN-NODE-01</td>
+                                <td class="p-3">Remote Desktop Session Initiated</td>
+                                <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold text-[10px]">AUTHORIZED</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ========================================== -->
+            <!-- MENU 8: SETTINGS & CONFIGURATION           -->
+            <!-- ========================================== -->
+            <section id="mod-settings" class="hidden flex-1 p-6 overflow-y-auto space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h2 class="text-xl font-bold text-navy-900">System Settings & Gateway Config</h2>
+                    <p class="text-xs text-slate-500">Global server parameters, E2EE keys, and RBAC roles.</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4 max-w-2xl">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">STUN / TURN Relay Address</label>
+                        <input type="text" value="turn.rdm-enterprise.internal:3478" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono">
+                    </div>
+                    <button onclick="triggerNotification('Settings Saved')" class="px-4 py-2 bg-accent-blue text-white font-bold rounded-lg text-xs">Save Settings</button>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- INSPECT DESIGN TOKENS DRAWER -->
+        <div id="inspect-drawer" class="hidden w-80 bg-navy-950 border-l border-navy-800 text-white p-4 text-xs space-y-4 shrink-0 z-30 font-mono">
+            <div class="flex justify-between items-center border-b border-navy-800 pb-2">
+                <span class="font-bold text-accent-blue">Design Tokens & Specs</span>
+                <button onclick="toggleDrawer('inspect-drawer')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div>
+                <div class="text-slate-400 text-[10px] uppercase mb-1">Enterprise Palette</div>
+                <div class="space-y-1 text-[11px]">
+                    <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded bg-navy-900 border border-slate-700"></span><span>#0B192C (Deep Navy)</span></div>
+                    <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded bg-accent-blue"></span><span>#008BFF (Accent Blue)</span></div>
+                    <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded bg-slate-50 text-black"></span><span>#F8FAFC (White / Slate)</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-navy-900 text-white px-4 py-3 rounded-lg shadow-2xl flex items-center space-x-3 text-xs font-semibold translate-y-20 opacity-0 transition-all duration-300 z-50 border border-navy-700">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toast-message">Action executed successfully</span>
+    </div>
+
+    <!-- JAVASCRIPT APP LOGIC -->
+    <script>
+        let zoomLevel = 1.0;
+
+        function zoomCanvas(delta) {
+            zoomLevel = Math.max(0.7, Math.min(1.3, zoomLevel + delta));
+            document.getElementById('viewport-container').style.transform = `scale(${zoomLevel})`;
+            document.getElementById('zoom-label').innerText = `${Math.round(zoomLevel * 100)}%`;
+        }
+
+        function resetZoom() {
+            zoomLevel = 1.0;
+            document.getElementById('viewport-container').style.transform = `scale(1)`;
+            document.getElementById('zoom-label').innerText = `100%`;
+        }
+
+        function switchTab(modId) {
+            const modules = ['mod-fleet', 'mod-desktop', 'mod-server', 'mod-shell', 'mod-viewer', 'mod-policy', 'mod-audit', 'mod-settings'];
+            modules.forEach(id => {
+                const el = document.getElementById(id);
+                const btn = document.getElementById(`nav-${id}`);
+                if (id === modId) {
+                    el.classList.remove('hidden');
+                    btn.className = "w-full px-3 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-between bg-accent-blue text-white shadow-md transition";
+                } else {
+                    el.classList.add('hidden');
+                    btn.className = "w-full px-3 py-2.5 rounded-lg font-semibold text-xs flex items-center justify-between text-slate-300 hover:bg-navy-800 hover:text-white transition";
+                }
+            });
+        }
+
+        function toggleWizardView(wizardId, workspaceId) {
+            document.getElementById(wizardId).classList.toggle('hidden');
+            document.getElementById(workspaceId).classList.toggle('hidden');
+        }
+
+        function launchSessionWorkspace(wizardId, workspaceId) {
+            document.getElementById(wizardId).classList.add('hidden');
+            document.getElementById(workspaceId).classList.remove('hidden');
+            triggerNotification('Connected to Remote Session Workspace');
+        }
+
+        function nextWizardStep(prefix, stepNum) {
+            if (stepNum === 2) {
+                document.getElementById(`${prefix}-step-1-content`).classList.add('hidden');
+                document.getElementById(`${prefix}-step-2-content`).classList.remove('hidden');
+                document.getElementById(`${prefix}-step-2`).className = "flex items-center space-x-2 text-accent-blue font-bold";
+            } else {
+                document.getElementById(`${prefix}-step-2-content`).classList.add('hidden');
+                document.getElementById(`${prefix}-step-1-content`).classList.remove('hidden');
+            }
+        }
+
+        function runPingTest(elementId) {
+            document.getElementById(elementId).innerText = "Testing ping...";
+            setTimeout(() => {
+                document.getElementById(elementId).innerText = "Latency: 8ms (P2P WebRTC Direct)";
+            }, 600);
+        }
+
+        function toggleDrawer(id) {
+            document.getElementById(id).classList.toggle('hidden');
+        }
+
+        function triggerNotification(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function switchMonitor(id) {
+            document.getElementById('btn-desktop-mon-1').className = id === 1 ? "px-2 py-0.5 rounded text-xs font-bold bg-accent-blue text-white" : "px-2 py-0.5 rounded text-xs font-medium text-slate-400 hover:text-white";
+            document.getElementById('btn-desktop-mon-2').className = id === 2 ? "px-2 py-0.5 rounded text-xs font-bold bg-accent-blue text-white" : "px-2 py-0.5 rounded text-xs font-medium text-slate-400 hover:text-white";
+            triggerNotification(`Switched Display Stream to Monitor #${id}`);
+        }
+
+        function toggleService(serviceName) {
+            const badge = document.getElementById(`status-${serviceName}`);
+            badge.innerText = "RESTARTING...";
+            badge.className = "px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 font-bold text-[10px]";
+            setTimeout(() => {
+                badge.innerText = "RUNNING";
+                badge.className = "px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold text-[10px]";
+                triggerNotification(`Service ${serviceName}.service restarted`);
+            }, 1000);
+        }
+
+        function runQuickCommand(cmd) {
+            const input = document.getElementById('shell-input');
+            input.value = cmd;
+            handleShellInput({ key: 'Enter' });
+        }
+
+        function handleShellInput(e) {
+            if (e.key === 'Enter') {
+                const input = document.getElementById('shell-input');
+                const val = input.value.trim();
+                if (val) {
+                    const logs = document.getElementById('shell-logs');
+                    let output = `<div class="text-slate-400 pl-3">Executed '${val}'</div>`;
+                    if (val === 'sysinfo') {
+                        output = `<div class="text-emerald-400 pl-3">OS: Windows Server 2025 Datacenter | CPU: 16 Cores | Memory: 32 GB</div>`;
+                    } else if (val === 'top') {
+                        output = `<div class="text-emerald-400 pl-3">Tasks: 142 total, 1 running, 141 sleeping | CPU: 4.2% us, 1.1% sy</div>`;
+                    } else if (val === 'clear') {
+                        logs.innerHTML = '';
+                        input.value = '';
+                        return;
+                    }
+                    logs.innerHTML += `<div class="text-purple-400">PS C:\\Windows\\System32> ${val}</div>${output}`;
+                    input.value = '';
+                    logs.scrollTop = logs.scrollHeight;
+                }
+            }
+        }
+
+        window.onload = function() {
+            const ctxOs = document.getElementById('chart-os-dist').getContext('2d');
+            new Chart(ctxOs, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Windows', 'Linux', 'macOS', 'Android', 'iOS'],
+                    datasets: [{
+                        data: [520, 380, 180, 110, 58],
+                        backgroundColor: ['#008BFF', '#f97316', '#06b6d4', '#10b981', '#6366f1']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const ctxTelemetry = document.getElementById('chart-fleet-telemetry').getContext('2d');
+            new Chart(ctxTelemetry, {
+                type: 'line',
+                data: {
+                    labels: ['10:00', '10:10', '10:20', '10:30', '10:40'],
+                    datasets: [{
+                        label: 'Traffic (Gbps)',
+                        data: [3.2, 4.1, 4.8, 4.2, 4.8],
+                        borderColor: '#008BFF',
+                        fill: false
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+    </script>
+</body>
+</html>
