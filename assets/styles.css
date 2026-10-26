@@ -109,6 +109,16 @@ body {
   transform: scale(1);
 }
 
+#canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  overflow: hidden;
+}
+
 /* Warp Speed Overlay Effect */
 #warp-overlay {
   pointer-events: none;

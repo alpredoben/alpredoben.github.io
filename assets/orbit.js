@@ -1,4 +1,48 @@
 'use strict';
+
+// Background MP3 Audio Setup
+const bgAudio = new Audio('./assets/background.mp3');
+bgAudio.loop = true;
+bgAudio.volume = 0.4;
+
+let isAudioPlaying = false;
+
+function startBackgroundAudio() {
+  if (!isAudioPlaying) {
+    bgAudio
+      .play()
+      .then(() => {
+        isAudioPlaying = true;
+        soundEnabled = true;
+        const soundIcon = document.getElementById('sound-icon');
+        if (soundIcon) {
+          soundIcon.className = 'fa-solid fa-volume-high text-amber-400';
+        }
+      })
+      .catch((err) => {
+        console.log(
+          'Autoplay dicegah oleh browser, menunggu interaksi pengguna:',
+          err
+        );
+      });
+  }
+}
+
+window.addEventListener('load', () => {
+  startBackgroundAudio();
+});
+
+const handleFirstInteraction = () => {
+  startBackgroundAudio();
+  window.removeEventListener('click', handleFirstInteraction);
+  window.removeEventListener('keydown', handleFirstInteraction);
+  window.removeEventListener('touchstart', handleFirstInteraction);
+};
+
+window.addEventListener('click', handleFirstInteraction);
+window.addEventListener('keydown', handleFirstInteraction);
+window.addEventListener('touchstart', handleFirstInteraction);
+
 // Web Audio Synthesizer State
 let audioCtx = null;
 let soundEnabled = false;
@@ -29,19 +73,25 @@ function playSpaceTone(freq, duration = 0.15, type = 'sine') {
   } catch (e) {}
 }
 
-// Sound Switch Button
+// Sound Toggle Button
 const soundBtn = document.getElementById('sound-toggle-btn');
 const soundIcon = document.getElementById('sound-icon');
-soundBtn.addEventListener('click', () => {
-  soundEnabled = !soundEnabled;
-  if (soundEnabled) {
-    initAudio();
-    soundIcon.className = 'fa-solid fa-volume-high text-amber-400';
-    playSpaceTone(523.25, 0.2);
-  } else {
-    soundIcon.className = 'fa-solid fa-volume-xmark text-gray-300';
-  }
-});
+if (soundBtn) {
+  soundBtn.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    if (soundEnabled) {
+      initAudio();
+      bgAudio.play();
+      isAudioPlaying = true;
+      soundIcon.className = 'fa-solid fa-volume-high text-amber-400';
+      playSpaceTone(523.25, 0.2);
+    } else {
+      bgAudio.pause();
+      isAudioPlaying = false;
+      soundIcon.className = 'fa-solid fa-volume-xmark text-gray-300';
+    }
+  });
+}
 
 // Custom Mouse Cursor
 const cursorDot = document.getElementById('space-cursor-dot');
@@ -73,25 +123,31 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-container.appendChild(renderer.domElement);
+if (container) {
+  container.appendChild(renderer.domElement);
+}
 
-// OrbitControls
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.maxDistance = 600;
-controls.minDistance = 15;
-controls.maxPolarAngle = Math.PI / 2 + 0.1;
+// OrbitControls with Safe Fallback
+let controls;
+try {
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.maxDistance = 600;
+  controls.minDistance = 15;
+  controls.maxPolarAngle = Math.PI / 2 + 0.1;
+} catch (e) {
+  console.error('Gagal memuat OrbitControls:', e);
+}
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(0x222233, 1.2);
 scene.add(ambientLight);
 
-// Sun Glow Point Light
 const sunLight = new THREE.PointLight(0xffaa00, 3.5, 800);
 scene.add(sunLight);
 
-// STARFIELD PARTICLES CANVAS PROCEDURAL
+// STARFIELD PARTICLES
 function createStarfield() {
   const starGeo = new THREE.BufferGeometry();
   const count = 4000;
@@ -111,9 +167,8 @@ function createStarfield() {
 }
 createStarfield();
 
-// PLANET DATA DEFINITION & PROCEDURAL GENERATION
+// PLANET DATA DEFINITION
 let speedMultiplier = 1;
-
 const planetData = [
   {
     name: 'MATAHARI',
@@ -130,27 +185,9 @@ const planetData = [
     speed: 0.03,
     color: 0xb5b5b5,
   },
-  {
-    name: 'VENUS',
-    radius: 3.5,
-    distance: 50,
-    speed: 0.022,
-    color: 0xe3bb76,
-  },
-  {
-    name: 'BUMI',
-    radius: 4.0,
-    distance: 72,
-    speed: 0.016,
-    color: 0x3b82f6,
-  },
-  {
-    name: 'MARS',
-    radius: 2.8,
-    distance: 94,
-    speed: 0.012,
-    color: 0xef4444,
-  },
+  { name: 'VENUS', radius: 3.5, distance: 50, speed: 0.022, color: 0xe3bb76 },
+  { name: 'BUMI', radius: 4.0, distance: 72, speed: 0.016, color: 0x3b82f6 },
+  { name: 'MARS', radius: 2.8, distance: 94, speed: 0.012, color: 0xef4444 },
   {
     name: 'YUPITER',
     radius: 8.5,
@@ -176,10 +213,8 @@ const planetData = [
 ];
 
 const planets = [];
-const orbitLines = [];
 
 planetData.forEach((data) => {
-  // Planet Mesh
   const geo = new THREE.SphereGeometry(data.radius, 32, 32);
   let mat;
 
@@ -202,7 +237,6 @@ planetData.forEach((data) => {
     radius: data.radius,
   };
 
-  // Saturn Rings
   if (data.ring) {
     const ringGeo = new THREE.RingGeometry(
       data.radius * 1.4,
@@ -223,7 +257,6 @@ planetData.forEach((data) => {
   scene.add(mesh);
   planets.push(mesh);
 
-  // Orbit Path Elliptical Line (Lintasan Orbit)
   if (data.distance > 0) {
     const orbitGeo = new THREE.BufferGeometry();
     const points = [];
@@ -246,11 +279,10 @@ planetData.forEach((data) => {
     });
     const orbitLine = new THREE.Line(orbitGeo, orbitMat);
     scene.add(orbitLine);
-    orbitLines.push({ mesh: orbitLine, defaultOpacity: 0.18 });
   }
 });
 
-// RAYCASTING FOR INTERACTION
+// RAYCASTING
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let hoveredPlanet = null;
@@ -263,9 +295,7 @@ window.addEventListener('mousemove', (e) => {
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 });
 
-// PLANET HOVER & CLICK HANDLERS
 window.addEventListener('click', (e) => {
-  // Ignore click if UI element clicked
   if (e.target.closest('header, button, .modal-overlay, #contact-form')) return;
 
   raycaster.setFromCamera(mouse, camera);
@@ -277,16 +307,15 @@ window.addEventListener('click', (e) => {
   }
 });
 
-// Quick-Jump Selector & Modal Trigger
 function openPlanetModal(planetName, planetMesh = null) {
   playSpaceTone(880, 0.3, 'sawtooth');
 
-  // Warp Overlay Animation
   const warpOverlay = document.getElementById('warp-overlay');
-  warpOverlay.classList.add('active');
-  setTimeout(() => warpOverlay.classList.remove('active'), 500);
+  if (warpOverlay) {
+    warpOverlay.classList.add('active');
+    setTimeout(() => warpOverlay.classList.remove('active'), 500);
+  }
 
-  // Zoom Camera to Planet
   const p =
     planetMesh || planets.find((item) => item.userData.name === planetName);
   if (p) {
@@ -300,21 +329,21 @@ function openPlanetModal(planetName, planetMesh = null) {
       targetPos.z + offset
     );
 
-    // Smooth Camera Tween
     let progress = 0;
     const startPos = camera.position.clone();
-    const startLook = controls.target.clone();
+    const startLook = controls ? controls.target.clone() : new THREE.Vector3();
 
     function fly() {
       progress += 0.05;
       camera.position.lerpVectors(startPos, camTarget, progress);
-      controls.target.lerpVectors(startLook, targetPos, progress);
-      controls.update();
+      if (controls) {
+        controls.target.lerpVectors(startLook, targetPos, progress);
+        controls.update();
+      }
 
       if (progress < 1) {
         requestAnimationFrame(fly);
       } else {
-        // Open Overlay Modal
         const modal = document.getElementById(`modal-${planetName}`);
         if (modal) modal.classList.add('active');
       }
@@ -323,16 +352,15 @@ function openPlanetModal(planetName, planetMesh = null) {
   }
 }
 
-// Attach buttons
 document.querySelectorAll('.planet-nav-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     const planet = btn.getAttribute('data-planet');
     openPlanetModal(planet);
-    document.getElementById('mobile-planet-menu').classList.add('hidden');
+    const mobileMenu = document.getElementById('mobile-planet-menu');
+    if (mobileMenu) mobileMenu.classList.add('hidden');
   });
 });
 
-// Close Modal & Back to Solar Orbit View Button
 document.querySelectorAll('.close-modal-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     document
@@ -342,19 +370,20 @@ document.querySelectorAll('.close-modal-btn').forEach((btn) => {
   });
 });
 
-// Reset Camera
 function resetCameraView() {
   playSpaceTone(440, 0.2);
   let progress = 0;
   const startPos = camera.position.clone();
-  const startLook = controls.target.clone();
+  const startLook = controls ? controls.target.clone() : new THREE.Vector3();
   const targetLook = new THREE.Vector3(0, 0, 0);
 
   function resetFly() {
     progress += 0.04;
     camera.position.lerpVectors(startPos, defaultCamPos, progress);
-    controls.target.lerpVectors(startLook, targetLook, progress);
-    controls.update();
+    if (controls) {
+      controls.target.lerpVectors(startLook, targetLook, progress);
+      controls.update();
+    }
 
     if (progress < 1) {
       requestAnimationFrame(resetFly);
@@ -370,78 +399,83 @@ document
   .getElementById('reset-cam-logo')
   ?.addEventListener('click', resetCameraView);
 
-// Speed Toggle Controls
 const speedBtn = document.getElementById('speed-toggle-btn');
 const speedLabel = document.getElementById('speed-label');
 let speedState = 1;
 
-speedBtn.addEventListener('click', () => {
-  speedState = (speedState % 3) + 1;
-  if (speedState === 1) {
-    speedMultiplier = 1;
-    speedLabel.innerText = 'ORBIT 1X';
-  } else if (speedState === 2) {
-    speedMultiplier = 3;
-    speedLabel.innerText = 'ORBIT 3X';
-  } else {
-    speedMultiplier = 0;
-    speedLabel.innerText = 'PAUSE ORBIT';
-  }
-  playSpaceTone(659.25, 0.15);
-});
+if (speedBtn) {
+  speedBtn.addEventListener('click', () => {
+    speedState = (speedState % 3) + 1;
+    if (speedState === 1) {
+      speedMultiplier = 1;
+      if (speedLabel) speedLabel.innerText = 'ORBIT 1X';
+    } else if (speedState === 2) {
+      speedMultiplier = 3;
+      if (speedLabel) speedLabel.innerText = 'ORBIT 3X';
+    } else {
+      speedMultiplier = 0;
+      if (speedLabel) speedLabel.innerText = 'PAUSE ORBIT';
+    }
+    playSpaceTone(659.25, 0.15);
+  });
+}
 
-// Camera View Mode Switcher
 const viewAngleBtn = document.getElementById('view-angle-btn');
 const viewModeLabel = document.getElementById('view-mode-label');
 let viewMode = 0;
 
-viewAngleBtn.addEventListener('click', () => {
-  viewMode = (viewMode + 1) % 3;
-  if (viewMode === 0) {
-    camera.position.set(0, 120, 260);
-    viewModeLabel.innerText = 'PERSPEKTIF 3D';
-  } else if (viewMode === 1) {
-    camera.position.set(0, 280, 0.1);
-    viewModeLabel.innerText = 'TOP-DOWN VIEW';
-  } else {
-    camera.position.set(220, 150, 220);
-    viewModeLabel.innerText = 'ISOMETRIK DEEP';
-  }
-  controls.target.set(0, 0, 0);
-  controls.update();
-  playSpaceTone(587.33, 0.15);
-});
+if (viewAngleBtn) {
+  viewAngleBtn.addEventListener('click', () => {
+    viewMode = (viewMode + 1) % 3;
+    if (viewMode === 0) {
+      camera.position.set(0, 120, 260);
+      if (viewModeLabel) viewModeLabel.innerText = 'PERSPEKTIF 3D';
+    } else if (viewMode === 1) {
+      camera.position.set(0, 280, 0.1);
+      if (viewModeLabel) viewModeLabel.innerText = 'TOP-DOWN VIEW';
+    } else {
+      camera.position.set(220, 150, 220);
+      if (viewModeLabel) viewModeLabel.innerText = 'ISOMETRIK DEEP';
+    }
+    if (controls) {
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+    playSpaceTone(587.33, 0.15);
+  });
+}
 
-// Mobile Dropdown Toggle
 document
   .getElementById('mobile-planet-trigger')
   ?.addEventListener('click', () => {
-    document.getElementById('mobile-planet-menu').classList.toggle('hidden');
+    const mobileMenu = document.getElementById('mobile-planet-menu');
+    if (mobileMenu) mobileMenu.classList.toggle('hidden');
   });
 
-// Contact Form Submit Handler
 document.getElementById('contact-form')?.addEventListener('submit', (e) => {
   e.preventDefault();
   const btn = document.getElementById('contact-submit');
+  if (!btn) return;
   btn.innerText = 'MEMPROSES TRANSMISI SINYAL...';
 
   setTimeout(() => {
-    btn.innerText = 'TRANSMISI NEPTUNUS TERKIRIM!';
-    confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+    btn.innerText = 'TRANSMISI RDM TERKIRIM!';
+    if (typeof confetti === 'function') {
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+    }
     playSpaceTone(1046.5, 0.4);
     e.target.reset();
 
     setTimeout(() => {
-      btn.innerText = 'KIRIM TRANSMISI SINYAL NEPTUNUS';
+      btn.innerText = 'KIRIM TRANSMISI SINYAL RDM';
     }, 3000);
   }, 1000);
 });
 
-// RENDER / ANIMATION LOOP
+// ANIMATION LOOP
 function animate() {
   requestAnimationFrame(animate);
 
-  // Orbit Rotation Motion
   planets.forEach((p) => {
     if (p.userData.distance > 0) {
       p.userData.angle += p.userData.speed * 0.2 * speedMultiplier;
@@ -451,7 +485,6 @@ function animate() {
     p.rotation.y += 0.01;
   });
 
-  // Raycasting Target Highlight
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(planets);
 
@@ -462,32 +495,34 @@ function animate() {
       playSpaceTone(783.99, 0.08);
     }
 
-    // Project 3D vector to 2D Screen
     const screenPos = target.position.clone().project(camera);
     const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
     const y = (-(screenPos.y * 0.5) + 0.5) * window.innerHeight;
 
-    reticle.style.left = `${x}px`;
-    reticle.style.top = `${y}px`;
-    reticle.style.opacity = '1';
-    reticleLabel.innerText = `TARGET: ${target.userData.name}`;
-    activeHoverInfo.innerText = `TARGET PLANET: ${target.userData.name} (KLIK UNTUK MEMBUKA)`;
+    if (reticle) {
+      reticle.style.left = `${x}px`;
+      reticle.style.top = `${y}px`;
+      reticle.style.opacity = '1';
+    }
+    if (reticleLabel)
+      reticleLabel.innerText = `TARGET: ${target.userData.name}`;
+    if (activeHoverInfo)
+      activeHoverInfo.innerText = `TARGET PLANET: ${target.userData.name} (KLIK UNTUK MEMBUKA)`;
   } else {
     hoveredPlanet = null;
-    reticle.style.opacity = '0';
-    activeHoverInfo.innerText = `MENGORBIT REVOLUSI REAL-TIME`;
+    if (reticle) reticle.style.opacity = '0';
+    if (activeHoverInfo)
+      activeHoverInfo.innerText = `EKSPLORASI MODUL ARSITEKTUR RDM`;
   }
 
-  controls.update();
+  if (controls) controls.update();
   renderer.render(scene, camera);
 }
 
-// RESIZE WINDOW HANDLER
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// START SYSTEM
 animate();
